@@ -1,0 +1,14 @@
+TechConf Deployment Outputs
+Generated: Tue Nov 18 21:16:54 UTC 2025
+
+Resource Group: techconf-rg
+Location: westeurope
+
+Web App URL: https://techconf-web-xizeh6mypik36.azurewebsites.net
+Function App URL: https://techconf-func-xizeh6mypik36.azurewebsites.net
+PostgreSQL Server: techconf-db-xizeh6mypik36.postgres.database.azure.com
+
+Next Steps:
+1. Restore database: PGPASSWORD='SecurePass123!' psql "host=techconf-db-xizeh6mypik36.postgres.database.azure.com port=5432 dbname=techconfdb user=techconfadmin@techconf-db-xizeh6mypik36 sslmode=require" < data/techconfdb_backup.sql
+2. Deploy web app: cd web && zip -r ../web-deploy.zip . -x "venv/*" -x "__pycache__/*" -x "*.pyc" && cd .. && az webapp deployment source config-zip --resource-group techconf-rg --name techconf-web-xizeh6mypik36 --src web-deploy.zip
+3. Deploy function: cd function && func azure functionapp publish techconf-func-xizeh6mypik36

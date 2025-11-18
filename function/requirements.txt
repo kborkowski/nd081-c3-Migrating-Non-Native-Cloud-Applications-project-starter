@@ -1,0 +1,16 @@
+# DO NOT include azure-functions-worker in this file
+# The Python Worker is managed by Azure Functions platform
+# Manually managing azure-functions-worker may cause unexpected issues
+
+# Azure Functions
+azure-functions>=1.18.0
+
+# Database
+psycopg2-binary==2.9.9
+
+# Email
+sendgrid==6.11.0
+python-http-client==3.3.7
+
+# Utilities
+python-dateutil==2.8.2

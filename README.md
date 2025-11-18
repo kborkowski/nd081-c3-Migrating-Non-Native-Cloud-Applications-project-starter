@@ -63,9 +63,143 @@ Complete a month cost analysis of each Azure resource to give an estimate total 
 
 | Azure Resource | Service Tier | Monthly Cost |
 | ------------ | ------------ | ------------ |
-| *Azure Postgres Database* |     |              |
-| *Azure Service Bus*   |         |              |
-| ...                   |         |              |
+| Azure App Service (Web App) | Basic B1 (1 Core, 1.75 GB RAM) | ~$13.14/month |
+| Azure PostgreSQL Database | Basic Gen5 (1 vCore, 5GB storage) | ~$25.00/month |
+| Azure Service Bus | Standard | ~$10.00/month (base) + $0.05 per million operations |
+| Azure Function App | Consumption Plan | First 1M executions free, then $0.20 per million |
+| Azure Storage Account | Standard LRS | ~$0.02/GB/month + transaction costs |
+| Application Insights | Basic (5GB free) | Free tier sufficient for small apps |
+| **Estimated Total** | | **~$50-60/month** |
+
+**Cost Optimization Notes:**
+- **Development/Testing**: Use shared App Service Plan (~$9.49/month) and disable resources when not in use
+- **Production**: Consider reserved instances for 30-40% savings on predictable workloads
+- **Scaling**: Consumption-based Function App scales automatically and only charges for actual usage
+- **Database**: Basic tier sufficient for small-medium workloads; consider burstable SKUs for cost savings
+- **Monitoring**: Application Insights free tier (5GB/month) adequate for initial deployment
 
 ## Architecture Explanation
-This is a placeholder section where you can provide an explanation and reasoning for your architecture selection for both the Azure Web App and Azure Function.
+
+### Architecture Overview
+This solution migrates a monolithic Flask web application to a modern, scalable microservices architecture on Azure, addressing the key pain points: scalability, performance, and cost-effectiveness.
+
+### Architecture Components
+
+#### 1. **Azure App Service (Web Application)**
+**Decision Rationale:**
+- **Platform-as-a-Service (PaaS)**: Eliminates infrastructure management overhead
+- **Auto-scaling**: Handles variable user load automatically during peak registration periods
+- **Built-in CI/CD**: Simplifies deployment pipeline
+- **Cost-effective**: Pay only for compute resources used, with scaling options from Basic to Premium tiers
+- **Python Support**: Native support for Flask applications with minimal code changes
+
+**Why not Azure VMs?**
+- VMs require manual patching, scaling configuration, and higher operational overhead
+- Higher cost for similar workload capacity
+- App Service provides better developer productivity
+
+#### 2. **Azure PostgreSQL Database**
+**Decision Rationale:**
+- **Managed Service**: Automated backups, patching, and high availability
+- **Compatibility**: Direct migration from existing PostgreSQL without schema changes
+- **Scalability**: Vertical and horizontal scaling options available
+- **Security**: Built-in SSL/TLS, firewall rules, and Azure AD integration
+- **Performance**: Connection pooling and query optimization tools
+
+**Why not Azure SQL?**
+- Existing PostgreSQL schema requires no refactoring
+- Team familiarity with PostgreSQL reduces learning curve
+- Cost-effective for this workload size
+
+#### 3. **Azure Service Bus (Message Queue)**
+**Decision Rationale:**
+- **Decoupling**: Separates web app from notification processing, preventing HTTP timeouts
+- **Reliability**: Guaranteed message delivery with dead-letter queue support
+- **Scalability**: Handles high message throughput during peak notification periods
+- **Asynchronous Processing**: Web app responds immediately while notifications process in background
+- **Enterprise Features**: Message sessions, duplicate detection, and scheduled delivery
+
+**Why not Azure Storage Queue?**
+- Service Bus provides advanced messaging features (sessions, dead-letter queues)
+- Better integration with Azure Functions for enterprise scenarios
+- Support for larger message sizes (256KB vs 64KB)
+
+#### 4. **Azure Functions (Notification Processing)**
+**Decision Rationale:**
+- **Serverless**: Zero infrastructure management, automatic scaling
+- **Event-driven**: Triggered automatically by Service Bus messages
+- **Cost-efficient**: Consumption plan charges only for execution time (first 1M executions free)
+- **Parallel Processing**: Multiple function instances handle notifications concurrently
+- **Independent Scaling**: Scales independently from web application based on queue depth
+
+**Why not App Service Background Job?**
+- Functions provide better isolation and independent scaling
+- More cost-effective for intermittent workloads
+- Automatic retry logic and error handling built-in
+
+#### 5. **Azure Storage Account**
+**Decision Rationale:**
+- **Function Requirement**: Required by Azure Functions for state management
+- **Static Assets**: Can serve static content for web app (CSS, JS, images)
+- **Backup Storage**: Can store database backups and logs
+- **Cost-effective**: Pay per GB stored with multiple redundancy options
+
+### Architecture Flow
+
+```
+1. User Registration:
+   Browser → Azure App Service → PostgreSQL Database → Response
+
+2. Notification Flow (Refactored):
+   Admin creates notification → 
+   Web App saves notification to DB → 
+   Web App sends notification ID to Service Bus Queue → 
+   Immediate response to admin →
+   Azure Function triggered by queue message →
+   Function queries DB for notification details →
+   Function queries DB for attendee list →
+   Function sends emails asynchronously →
+   Function updates notification status in DB
+```
+
+### Key Improvements
+
+#### **Scalability**
+- **Web App**: Auto-scales based on CPU/memory metrics to handle user load spikes
+- **Function App**: Automatically scales based on queue depth (up to 200 instances)
+- **Database**: Can scale vertically (vCores) or horizontally (read replicas)
+
+#### **Performance**
+- **Async Processing**: Notifications no longer block HTTP requests
+- **Parallel Execution**: Multiple function instances process notifications simultaneously
+- **Queue Buffering**: Service Bus queues messages during high load
+
+#### **Cost-Effectiveness**
+- **Consumption Model**: Pay only for actual function executions
+- **Right-sized Resources**: Start with Basic tier, scale as needed
+- **Managed Services**: Reduce operational costs (no server management)
+
+#### **Reliability**
+- **Message Durability**: Service Bus ensures no notification is lost
+- **Retry Logic**: Automatic retries for failed operations
+- **Dead Letter Queue**: Failed messages moved for investigation
+- **Database Backups**: Automated daily backups with point-in-time restore
+
+### Deployment Strategy
+1. **Blue-Green Deployment**: Zero-downtime deployments using deployment slots
+2. **Infrastructure as Code**: Use ARM templates or Terraform for reproducible deployments
+3. **CI/CD Pipeline**: Azure DevOps or GitHub Actions for automated deployments
+4. **Monitoring**: Application Insights for end-to-end visibility
+
+### Security Considerations
+- **Managed Identity**: Use for service-to-service authentication
+- **Key Vault**: Store secrets and connection strings
+- **Network Isolation**: VNet integration for production environments
+- **SSL/TLS**: All connections encrypted in transit
+- **Firewall Rules**: Restrict database access to Azure services only
+
+### Future Enhancements
+- **CDN**: Add Azure CDN for static asset delivery
+- **Redis Cache**: Implement caching layer for frequently accessed data
+- **API Management**: Add API gateway for rate limiting and monitoring
+- **Container Option**: Consider Azure Container Apps for more control

@@ -1,0 +1,8 @@
+<step title="Incoming Request" date="2025-11-18T22:26:40.526" instance="40b45f" url="/api/deployments/latest" method="GET" type="request" pid="770,1,18" Accept="*/*" Host="techconf-func-xizeh6mypik36.scm.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (DEB)" Accept-Encoding="gzip, deflate" Authorization="Bas..." x-ms-client-request-id="69798edc-c4cd-11f0-b64b-7ced8d0c5728" X-ARR-LOG-ID="69798edc-c4cd-11f0-b64b-7ced8d0c5728" CLIENT-IP="20.61.127.55:55952" X-SITE-DEPLOYMENT-ID="techconf-func-xizeh6mypik36" WAS-DEFAULT-HOSTNAME="techconf-func-xizeh6mypik36.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/deployments/latest" X-Client-IP="20.61.127.55" X-Client-Port="55952" >
+  <step title="DeploymentService.GetResult" date="2025-11-18T22:26:40.536" >
+    <step title="DeploymentService.GetLatestDeployment" date="2025-11-18T22:26:40.538" >
+      <step title="DeploymentManager.GetResults" date="2025-11-18T22:26:40.572" /><!-- duration: 318ms -->
+    </step><!-- duration: 400ms -->
+  </step><!-- duration: 453ms -->
+  <step title="Outgoing response" date="2025-11-18T22:26:41.001" type="response" statusCode="202" statusText="Accepted" /><!-- duration: 10ms -->
+</step><!-- duration: 488ms -->

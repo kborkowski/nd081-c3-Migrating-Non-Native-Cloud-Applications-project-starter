@@ -2,7 +2,7 @@ from app import app, db, queue_client
 from datetime import datetime
 from app.models import Attendee, Conference, Notification
 from flask import render_template, session, request, redirect, url_for, flash, make_response, session
-from azure.servicebus import Message
+from azure.servicebus import ServiceBusMessage
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import logging
@@ -68,27 +68,47 @@ def notification():
             db.session.commit()
 
             ##################################################
-            ## TODO: Refactor This logic into an Azure Function
-            ## Code below will be replaced by a message queue
+            ## REFACTORED: Send notification ID to Azure Service Bus Queue
+            ## Azure Function will process the notification asynchronously
             #################################################
-            attendees = Attendee.query.all()
+            
+            if queue_client:
+                # Send notification ID to Service Bus queue
+                try:
+                    sender = queue_client.get_queue_sender(queue_name=app.config.get('SERVICE_BUS_QUEUE_NAME'))
+                    message = ServiceBusMessage(str(notification.id))
+                    sender.send_messages(message)
+                    sender.close()
+                    
+                    notification.status = 'Queued for processing'
+                    db.session.commit()
+                    
+                    logging.info(f'Notification {notification.id} queued to Service Bus')
+                except Exception as e:
+                    logging.error(f'Failed to queue notification: {str(e)}')
+                    notification.status = 'Failed to queue'
+                    db.session.commit()
+            else:
+                # Fallback: Process synchronously if Service Bus is not configured (local testing)
+                logging.warning('Service Bus not configured. Processing notification synchronously.')
+                attendees = Attendee.query.all()
 
-            for attendee in attendees:
-                subject = '{}: {}'.format(attendee.first_name, notification.subject)
-                send_email(attendee.email, subject, notification.message)
+                for attendee in attendees:
+                    subject = '{}: {}'.format(attendee.first_name, notification.subject)
+                    send_email(attendee.email, subject, notification.message)
 
-            notification.completed_date = datetime.utcnow()
-            notification.status = 'Notified {} attendees'.format(len(attendees))
-            db.session.commit()
-            # TODO Call servicebus queue_client to enqueue notification ID
+                notification.completed_date = datetime.utcnow()
+                notification.status = 'Notified {} attendees (synchronous)'.format(len(attendees))
+                db.session.commit()
 
             #################################################
-            ## END of TODO
+            ## END of REFACTORING
             #################################################
 
             return redirect('/Notifications')
-        except :
-            logging.error('log unable to save notification')
+        except Exception as e:
+            logging.error(f'Error unable to save notification: {str(e)}')
+            return redirect('/Notification')
 
     else:
         return render_template('notification.html')
@@ -96,12 +116,21 @@ def notification():
 
 
 def send_email(email, subject, body):
-    if not app.config.get('SENDGRID_API_KEY'):
+    sendgrid_key = app.config.get('SENDGRID_API_KEY')
+    
+    if not sendgrid_key:
+        logging.info(f'SendGrid not configured. Would send email to {email} with subject: {subject}')
+        return
+    
+    try:
         message = Mail(
             from_email=app.config.get('ADMIN_EMAIL_ADDRESS'),
             to_emails=email,
             subject=subject,
             plain_text_content=body)
 
-        sg = SendGridAPIClient(app.config.get('SENDGRID_API_KEY'))
-        sg.send(message)
+        sg = SendGridAPIClient(sendgrid_key)
+        response = sg.send(message)
+        logging.info(f'Email sent to {email}, status: {response.status_code}')
+    except Exception as e:
+        logging.error(f'Failed to send email to {email}: {str(e)}')
